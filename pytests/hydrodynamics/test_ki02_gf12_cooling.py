@@ -272,3 +272,32 @@ def test_townsend_coefficients_are_finite():
     """The Townsend (2009) Y_k coefficients of the table are all finite."""
     Y = np.asarray(SETUP.cooling_curve_params.Y_table)
     assert np.all(np.isfinite(Y))
+
+
+def test_code_temperature_from_physical_pressure():
+    """T1_to_code and ki02_gf12_temperature against P = (n_H + n_He + n_e) k_B T.
+
+    Builds the pressure of gas at a physical T from the TIGRESS particle count
+    (1.1 + x_e(T)) n_H, independently of ``T1_to_code``, and recovers T through
+    the EOS and the post-processing inversion. The rate tests alone barely
+    constrain ``T1_to_code``.
+    """
+    from astronomix._modules._cooling._cooling_tables import (
+        TIGRESS_MU_H,
+        TIGRESS_X_PART,
+        _KI02GF12Model,
+        ki02_gf12_temperature,
+    )
+
+    T_phys = np.logspace(1.5, 8.0, 27)
+    n_H = 3.0
+    x_e, _ = _KI02GF12Model().electron_fraction(T_phys)
+    P_code = (TIGRESS_X_PART + x_e) * n_H * 1.380649e-16 * T_phys / P_U
+    rho_code = np.full_like(T_phys, n_H * TIGRESS_MU_H * 1.6735575e-24 / RHO_U)
+
+    T_code = np.asarray(
+        get_temperature_from_pressure(jnp.asarray(rho_code), jnp.asarray(P_code), X, Z),
+        np.float64,
+    )
+    T_back = ki02_gf12_temperature(T_code / SETUP.T1_to_code)
+    np.testing.assert_allclose(T_back, T_phys, rtol=2e-3)
