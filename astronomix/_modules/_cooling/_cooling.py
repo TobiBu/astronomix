@@ -615,7 +615,7 @@ def dtemperature_dt(
     heating = heating_rate
     if heating_factor_table is not None and heating_factor_table.shape[0] > 0:
         heating = heating_rate * jnp.interp(
-            jnp.log10(temperature),
+            jnp.log10(jnp.maximum(temperature, jnp.finfo(temperature.dtype).tiny)),
             heating_log10_T_table,
             heating_factor_table,
         )

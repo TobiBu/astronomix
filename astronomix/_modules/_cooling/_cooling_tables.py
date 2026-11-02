@@ -22,6 +22,7 @@ completeness; the exact-integration scheme that would use them is not wired in.
 from pathlib import Path
 
 # typing
+from functools import lru_cache
 from typing import NamedTuple
 
 # jax
@@ -486,6 +487,12 @@ class _KI02GF12Model:
         return 10**lT
 
 
+@lru_cache(maxsize=8)
+def _cached_model(zprime: float) -> "_KI02GF12Model":
+    """One model per metallicity, so repeated conversions do not reload the table."""
+    return _KI02GF12Model(zprime=zprime)
+
+
 def ki02_gf12_temperature(T1, zprime: float = 1.0) -> np.ndarray:
     """
     Physical temperature T [K] from T1 = T / mu(T) [K] for the KI02 + GF12 model.
@@ -501,7 +508,7 @@ def ki02_gf12_temperature(T1, zprime: float = 1.0) -> np.ndarray:
     Returns:
         The physical temperature T in Kelvin, with the shape of ``T1``.
     """
-    return _KI02GF12Model(zprime=zprime).temperature_from_T1(np.asarray(T1, float))
+    return _cached_model(float(zprime)).temperature_from_T1(np.asarray(T1, float))
 
 
 def ki02_gf12_cooling(
@@ -511,7 +518,7 @@ def ki02_gf12_cooling(
     zprime: float = 1.0,
     heat_ratio: float = 1.0,
     log10_T1_min: float = 0.9,
-    log10_T1_max: float = 9.0,
+    log10_T1_max: float = 10.0,
     dlog10_T1: float = 0.01,
     log10_T_blend: float = 4.2,
     dlog10_T_blend: float = 0.05,
@@ -551,7 +558,10 @@ def ki02_gf12_cooling(
         heat_ratio: FUV intensity relative to the solar neighbourhood,
             multiplying Gamma_0 = 2e-26 erg/s per H.
         log10_T1_min: Lower end of the table in log10 T1 [K].
-        log10_T1_max: Upper end of the table in log10 T1 [K].
+        log10_T1_max: Upper end of the table in log10 T1 [K]. The curve is
+            zero above it, so it must lie above the hottest gas: the default
+            10 is T ~ 6e9 K (9 would stop cooling above T ~ 6e8 K, which
+            starburst winds exceed).
         dlog10_T1: Table spacing in dex; 0.01 dex keeps the piecewise power law
             within ~0.1% of the smooth curve.
         log10_T_blend: Centre of the KI02 -> GF12 blend in log10 T [K].
