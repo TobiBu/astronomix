@@ -321,8 +321,9 @@ def athenak_ism_cooling(
 # ====== ↓ KI02 + Gnat & Ferland (2012), TIGRESS conventions ↓ =
 # -------------------------------------------------------------
 
-#: rho / (n_H m_H) and (n_H + n_He) / n_H of TIGRESS-classic (Kim & Ostriker
-#: 2017); they define n_H and mu(T) = TIGRESS_MU_H / (TIGRESS_X_PART + x_e).
+#: rho / (n_H m_H) and (n_H + n_He) / n_H of TIGRESS (Kim & Ostriker 2017);
+#: they define n_H and, with the CIE electron fraction x_e(T) of TIGRESS-NCR /
+#: pyathena, mu(T) = TIGRESS_MU_H / (TIGRESS_X_PART + x_e).
 TIGRESS_MU_H = 1.4271
 TIGRESS_X_PART = 1.1
 
@@ -361,6 +362,14 @@ class KI02GF12Cooling(NamedTuple):
     #: astronomix temperatures by this and apply ``ki02_gf12_temperature`` to
     #: obtain the physical temperature.
     T1_to_code: float
+
+    #: The X and Z the tables were built for. Pass the same values to
+    #: ``CoolingParams``: the kernel prefactor uses them, and a mismatch
+    #: silently rescales the cooling and heating.
+    hydrogen_mass_fraction: float
+
+    #: See ``hydrogen_mass_fraction``.
+    metal_mass_fraction: float
 
 
 class _LogHermite:
@@ -538,6 +547,12 @@ def ki02_gf12_cooling(
       hydrogen ionises (constant heating would heat a hot, rarefied wind);
     * mu(T) = 1.4271 / (1.1 + x_e(T)), x_e from CIE plus a 2e-3 floor.
 
+    Differences from TIGRESS-classic (Kim & Ostriker 2017): mu(T) and the
+    heating cut-off 1 - x_HII(T) follow TIGRESS-NCR / pyathena (KO17 switch
+    the heating off with (mu - mu_ion) / (mu_ato - mu_ion)), and no
+    metagalactic floor is added to the FUV field (KO17's + 0.0024 J_0; include
+    it in ``heat_ratio`` if wanted).
+
     Differences from ``athenak_ism_cooling``: AthenaK normalises with the total
     particle density n = rho / (0.618 m_u) and labels all gas with mu = 0.618,
     i.e. ~5x stronger cooling and ~2x lower neutral-gas temperatures than
@@ -552,8 +567,9 @@ def ki02_gf12_cooling(
     Args:
         code_units: The code-unit system.
         hydrogen_mass_fraction: X of ``CoolingParams`` (sets the kernel's mu,
-            mu_e, mu_H; the physical normalisation uses TIGRESS n_H).
-        metal_mass_fraction: Z of ``CoolingParams``.
+            mu_e, mu_H; the physical normalisation uses TIGRESS n_H). Returned
+            as ``hydrogen_mass_fraction`` so the caller passes the same value.
+        metal_mass_fraction: Z of ``CoolingParams`` (returned likewise).
         zprime: Gas metallicity in solar units (scales the GF12 metal cooling).
         heat_ratio: FUV intensity relative to the solar neighbourhood,
             multiplying Gamma_0 = 2e-26 erg/s per H.
@@ -643,6 +659,8 @@ def ki02_gf12_cooling(
         heating_factor_table=jnp.asarray(heating_factor),
         floor_temperature=float(T1_to_code * 10.0),
         T1_to_code=float(T1_to_code),
+        hydrogen_mass_fraction=float(hydrogen_mass_fraction),
+        metal_mass_fraction=float(metal_mass_fraction),
     )
 
 

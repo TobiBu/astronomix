@@ -106,8 +106,8 @@ def _as_float32(tree):
 def _cooling_params(heating=True):
     """CoolingParams of the KI02 + GF12 setup, optionally without heating."""
     return CoolingParams(
-        hydrogen_mass_fraction=X,
-        metal_mass_fraction=Z,
+        hydrogen_mass_fraction=SETUP.hydrogen_mass_fraction,
+        metal_mass_fraction=SETUP.metal_mass_fraction,
         floor_temperature=SETUP.floor_temperature,
         clamp_to_floor=True,
         heating_rate=SETUP.heating_rate if heating else 0.0,
